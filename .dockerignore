@@ -1,0 +1,48 @@
+# Bytecode and Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+
+# Virtual environments
+venv/
+.env
+*.env
+
+# Logs
+logs/
+*.log
+
+# Ignore package files
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Ignore dependency files
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Ignore Docker-related files
+docker-compose.yml
+Dockerfile
+
+# Ignore IDE and editor files
+.vscode/
+.idea/
+*.iml
+
+# Ignore test files and coverage reports
+tests/
+coverage/
+*.cover
+.hypothesis/
+.cache/
+.nox/
+.tox/
+
+# Ignore system-specific files
+.DS_Store
+Thumbs.db

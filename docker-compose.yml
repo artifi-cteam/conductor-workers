@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  conductor:
+    image: orkes/conductor
+    container_name: conductor_server
+    ports:
+      - "8080:8080"  # Conductor UI
+      - "5000:5000"  # API port
+    environment:
+      - DB=postgres
+    restart: always
+
+  flask_app:
+    build: .
+    container_name: flask_server
+    ports:
+      - "3000:3000"
+    depends_on:
+      - conductor
+    restart: always
