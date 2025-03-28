@@ -1,0 +1,79 @@
+{
+    "name": "get_submission_analysis",
+    "description": "A test workflow with WAIT_FOR_CALLBACK",
+    "version": 1,
+    "tasks": [
+        {
+            "name": "wait_for_file_upload",
+            "taskReferenceName": "wait_for_upload",
+            "type": "SIMPLE", 
+            "inputParameters": {
+              "file": "${workflow.input.file}", 
+              "filename": "${workflow.input.filename}"
+            }
+          },
+      {
+        "name": "generate_auth_token",
+        "taskReferenceName": "generate_auth",
+        "type": "SIMPLE",
+        "inputParameters": {}
+      },
+      {
+        "name": "get_upload_url",
+        "taskReferenceName": "upload_task",
+        "type": "SIMPLE",
+        "inputParameters": {
+          "filename": "${wait_for_upload.output.outputData.filename}",
+          "auth_token": "${generate_auth.output.outputData.auth_token}"
+        }
+      },
+      {
+        "name": "upload_file",
+        "taskReferenceName": "upload_file_ref",
+        "type": "SIMPLE",
+        "inputParameters": {
+          "upload_url": "${upload_task.output.outputData.upload_url}"
+        }
+      },
+      {
+        "name": "trigger_processing",
+        "taskReferenceName": "trigger_processing_ref",
+        "type": "SIMPLE",
+        "inputParameters": {
+          "auth_token": "${generate_auth.output.outputData.auth_token}",
+          "tx_id": "${upload_task.output.outputData.tx_id}"
+        }
+      },
+      {
+        "name": "poll_submission_status",
+        "taskReferenceName": "poll_submission_status_ref",
+        "type": "SIMPLE",
+        "inputParameters": {
+          "auth_token": "${generate_auth.output.outputData.auth_token}",
+          "tx_id": "${upload_task.output.outputData.tx_id}"
+        }
+      },
+      {
+        "name": "fetch_submission_data",
+        "taskReferenceName": "fetch_submission_data_ref",
+        "type": "SIMPLE",
+        "inputParameters": {
+          "auth_token": "${generate_auth.output.outputData.auth_token}",
+          "tx_id": "${upload_task.output.outputData.tx_id}"
+        }
+      }
+    ],
+    "outputParameters": {
+      "final_result": "${fetch_submission_data_ref.output.outputData}"
+    },
+    "schemaVersion": 2,
+    "restartable": true,
+    "workflowStatusListenerEnabled": false,
+    "ownerEmail": "vinay.kalura@cloud4c.com",
+    "timeoutPolicy": "ALERT_ONLY",
+    "timeoutSeconds": 0,
+    "variables": {},
+    "inputTemplate": {},
+    "enforceSchema": true
+  }
+  

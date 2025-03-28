@@ -1,0 +1,134 @@
+{
+    "name": "my_sample_workflow",
+    "description": "A test workflow",
+    "version": 1,
+    "tasks": [
+      {
+        "name": "generate_auth_token",
+        "taskReferenceName": "generate_auth",
+        "inputParameters": {},
+        "type": "SIMPLE",
+        "decisionCases": {},
+        "defaultCase": [],
+        "forkTasks": [],
+        "startDelay": 0,
+        "joinOn": [],
+        "optional": false,
+        "defaultExclusiveJoinTask": [],
+        "asyncComplete": false,
+        "loopOver": [],
+        "onStateChange": {},
+        "permissive": false
+      },
+      {
+        "name": "get_upload_url",
+        "taskReferenceName": "upload_task",
+        "inputParameters": {
+          "filename": "${workflow.input.filename}",
+          "auth_token": "${generate_auth.output.outputData.auth_token}"
+        },
+        "type": "SIMPLE",
+        "decisionCases": {},
+        "defaultCase": [],
+        "forkTasks": [],
+        "startDelay": 0,
+        "joinOn": [],
+        "optional": false,
+        "defaultExclusiveJoinTask": [],
+        "asyncComplete": false,
+        "loopOver": [],
+        "onStateChange": {},
+        "permissive": false
+      },
+      {
+        "name": "upload_file",
+        "taskReferenceName": "upload_file_ref",
+        "inputParameters": {
+          "upload_url": "${upload_task.output.outputData.upload_url}"
+        },
+        "type": "SIMPLE",
+        "decisionCases": {},
+        "defaultCase": [],
+        "forkTasks": [],
+        "startDelay": 0,
+        "joinOn": [],
+        "optional": false,
+        "defaultExclusiveJoinTask": [],
+        "asyncComplete": false,
+        "loopOver": [],
+        "onStateChange": {},
+        "permissive": false
+      },
+      {
+        "name": "trigger_processing",
+        "taskReferenceName": "trigger_processing_ref",
+        "inputParameters": {
+          "auth_token": "${generate_auth.output.outputData.auth_token}",
+          "tx_id": "${upload_task.output.outputData.tx_id}"
+        },
+        "type": "SIMPLE",
+        "decisionCases": {},
+        "defaultCase": [],
+        "forkTasks": [],
+        "startDelay": 0,
+        "joinOn": [],
+        "optional": false,
+        "defaultExclusiveJoinTask": [],
+        "asyncComplete": false,
+        "loopOver": [],
+        "onStateChange": {},
+        "permissive": false
+      },
+      {
+        "name": "poll_submission_status",
+        "taskReferenceName": "poll_submission_status_ref",
+        "inputParameters": {
+          "auth_token": "${generate_auth.output.outputData.auth_token}",
+          "tx_id": "${upload_task.output.outputData.tx_id}"
+        },
+        "type": "SIMPLE",
+        "decisionCases": {},
+        "defaultCase": [],
+        "forkTasks": [],
+        "startDelay": 0,
+        "joinOn": [],
+        "optional": false,
+        "defaultExclusiveJoinTask": [],
+        "asyncComplete": false,
+        "loopOver": [],
+        "onStateChange": {},
+        "permissive": false
+      },
+      {
+        "name": "fetch_submission_data",
+        "taskReferenceName": "fetch_submission_data_ref",
+        "inputParameters": {
+          "auth_token": "${generate_auth.output.outputData.auth_token}",
+          "tx_id": "${upload_task.output.tx_id}"
+        },
+        "type": "SIMPLE",
+        "decisionCases": {},
+        "defaultCase": [],
+        "forkTasks": [],
+        "startDelay": 0,
+        "joinOn": [],
+        "optional": false,
+        "defaultExclusiveJoinTask": [],
+        "asyncComplete": false,
+        "loopOver": [],
+        "onStateChange": {},
+        "permissive": false
+      }
+    ],
+    "inputParameters": [],
+    "outputParameters": {},
+    "schemaVersion": 2,
+    "restartable": true,
+    "workflowStatusListenerEnabled": false,
+    "ownerEmail": "vinay.kalura@cloud4c.com",
+    "timeoutPolicy": "ALERT_ONLY",
+    "timeoutSeconds": 0,
+    "variables": {},
+    "inputTemplate": {},
+    "enforceSchema": true
+  }

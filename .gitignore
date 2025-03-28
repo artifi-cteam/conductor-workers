@@ -1,0 +1,72 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+venv/
+venvv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs-info/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.txt
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written into a dist/ directory.
+#  If you use a builds directory instead, adjust the following appropriately.
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.profile.ps1
+.venv
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Poetry
+poetry.lock
+
+# FastAPI specific (if you have these)
+.sqlite
+*.sqlite3
+instance/
+
+# OS generated files #
+.DS_Store
+Thumbs.db
