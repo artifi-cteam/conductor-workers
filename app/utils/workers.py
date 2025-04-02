@@ -9,7 +9,7 @@ import os
 import requests
  
 from app.service.mongo_service import save_report_data
-from parsers import (
+from app.utils.parsers import (
     parse_advanced_property,
     parse_auto,
     parse_general_liability,
@@ -20,7 +20,7 @@ from parsers import (
 load_dotenv(override=True)
  
 # Conductor API URL
-API_URL = "http://localhost:8080/api"
+API_URL = os.getenv('CONDUCTOR_URL')
  
 DATA_PACKAGE_IDS = [
     "elevate-us-common-c0001",
@@ -266,7 +266,7 @@ def push_to_mongo(task):
     report_data = input_data.get("report_id","")
     artifi_id = "TEST001"
 
-    save_report_data(report_data, artifi_id, tx_id)
+    # save_report_data(report_data, artifi_id, tx_id)
  
 # Register Workers
 worker_auth = Worker(
