@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   conductor:
-    image: orkes/conductor
+    image: orkesio/orkes-conductor-community
     container_name: conductor_server
     ports:
       - "8080:8080"  # Conductor UI
