@@ -41,6 +41,9 @@ jobs:
         run: |
           docker build -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/conductor-workers:latest .
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/conductor-workers:latest
+      - name: Replace AWS Account ID in YAML
+        run: |
+          sed -i "s|AWS_ACCOUNT_ID_PLACEHOLDER|${{ secrets.AWS_ACCOUNT_ID }}|g" k8s/deployment.yaml
 
       - name: Deploy to Kubernetes
         run: |

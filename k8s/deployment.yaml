@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: conductor-workers
-          image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/conductor-workers:latest
+          image: AWS_ACCOUNT_ID_PLACEHOLDER.dkr.ecr.us-east-1.amazonaws.com/conductor-workers:latest
           ports:
             - containerPort: 5000
           envFrom:
