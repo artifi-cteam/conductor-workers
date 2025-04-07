@@ -259,6 +259,73 @@ def fetch_submission_data(task):
 
     return structured_response
 
+def send_to_agent_service(task):
+    
+    input_data = task.input_data
+    print(input_data)
+
+    filtered_data = {key: input_data[key] for key in ["Common", "Property", "Advanced Property"]}
+
+    # Call agent service:
+
+    # Call agent service with whole data:
+
+
+
+def send_to_service_now(task):
+    input_data = task.input_data
+    print(input_data)
+
+    url = "https://elevatenowtechdemo1.service-now.com/api/x_elete_ins/load_package/commons"
+    headers = {"Content-Type": "application/json"}
+
+    # Mocked agent data instead of querying the database
+    agent_data = {
+        "Appetite": "Mocked Appetite Data",
+        "PropertyInsights": "Mocked Property Insights",
+        "LossInsights": "Mocked Loss Insights"
+    }
+
+    appetite = agent_data.get("Appetite", "")
+    property_insights = agent_data.get("PropertyInsights", "")
+    loss_insights = agent_data.get("LossInsights", "")
+
+    # Mocked BP data instead of querying the database
+    bp_data = {
+        "artifi_id": "mocked_artifi_id",
+        "structured_data": {"mocked_key": "mocked_value"}
+    }
+    artifi_id = bp_data.get("artifi_id")
+
+    # Mocked case ID instead of querying the database
+    case_id_row = {"case_id": "MOCKED_CASE_ID"}
+    case_id = case_id_row.get("case_id")
+
+    print(bp_data)
+    print(case_id)
+
+    parsed_data = bp_data.get("structured_data", {})
+
+    data = {
+        "case_id": case_id,
+        "parsed_data": parsed_data,
+        "insights": {
+            "property_insights": str(property_insights),
+            "loss": str(loss_insights),
+            "appetite": str(appetite),
+        },
+    }
+
+    # Actual API request
+    response = requests.post(url, headers=headers, json=data)
+
+    print(response.status_code)
+    print(response.json())
+
+    return data
+
+
+
 def push_to_mongo(task):
     input_data = task.input_data
     print(input_data)
@@ -267,6 +334,8 @@ def push_to_mongo(task):
     artifi_id = "TEST001"
 
     # save_report_data(report_data, artifi_id, tx_id)
+
+    
  
 # Register Workers
 worker_auth = Worker(
@@ -292,6 +361,10 @@ worker_fetch_submission_data = Worker(
 worker_callback = Worker(
     task_definition_name="wait_for_file_upload",
     execute_function=wait_for_file_upload
+)
+worker_send_to_service_now = Worker(
+    task_definition_name = "send_to_service_now",
+    execution_function = send_to_service_now
 )
  
 handler = TaskHandler(
