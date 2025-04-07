@@ -2,9 +2,11 @@ import json
 import time
 import os
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import requests
 
 app = Flask(__name__)
+CORS(app)
 
 CONDUCTOR_URL = os.getenv('CONDUCTOR_URL')
 WORKFLOW_NAME = 'get_submission_analysis'
@@ -38,7 +40,7 @@ def start_workflow():
     }
     payload = {
         "name": WORKFLOW_NAME,
-        "version": 1,
+        "version": 2,
         "input": workflow_input
     }
     
