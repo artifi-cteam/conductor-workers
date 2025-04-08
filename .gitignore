@@ -60,6 +60,7 @@ ENV/
 
 # Jupyter Notebook
 .ipynb_checkpoints/
+.ipynb
 
 # Poetry
 poetry.lock
