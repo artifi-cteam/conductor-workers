@@ -3,3 +3,4 @@ python-dotenv
 conductor-python
 pymongo
 gunicorn
+flask_cors
