@@ -13,4 +13,8 @@ DATA_PACKAGE_IDS = [
     "elevate-us-common-c0001",
     "default-us-admitted-advanced-property-l0001",
     "default-us-loss-run-c0001",
+    "elevate-us-gl-c0001",
+    "elevate-us-property-l0001",
+    "elevate-us-admitted-auto-c0001",
+    "elevate-us-admitted-workers-comp-c0001",
 ]
