@@ -59,8 +59,10 @@ def save_report_data(report_data, artifi_id, tx_id):
     print(report_data)
     print(type(report_data))
 
-    for col_name in DATA_PACKAGE_IDS:
-        report_doc[col_name] = report_data.get(col_name, None)
+    report_doc["bp_parsed_response"] = report_data
+
+    # for col_name in DATA_PACKAGE_IDS:
+    #     report_doc[col_name] = report_data.get(col_name, None)
 
     bp_collection.insert_one(report_doc)
     print(f"Report data for tx_id {tx_id} saved successfully")
