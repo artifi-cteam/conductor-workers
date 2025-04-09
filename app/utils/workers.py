@@ -3,6 +3,7 @@ import json
 import tempfile
 import time
 import uuid
+from app.utils.conductor_logger import log_message
 from app.utils.dummy_response import dummy_response
 from conductor.client.automator.task_handler import TaskHandler
 from conductor.client.configuration.configuration import Configuration
@@ -226,49 +227,125 @@ def trigger_processing(task):
  
  
 def poll_submission_status(task):
-    input_data = task.input_data
-    auth_token = input_data.get("auth_token", "")
-    tx_id = input_data.get("tx_id", "")
-    
-    retry_interval = 30  # Starting retry interval (in seconds)
-    max_retry_interval = 120  # Maximum retry interval (in seconds), for example 30 minutes
-    
-    url = f"https://api-smartdata.di-beta.boldpenguin.com/universal/v4/universal-submit/status/{tx_id}"
-    headers = {
-        "x-api-key": os.getenv("BP_API_KEY"),
-        "Authorization": f"Bearer {auth_token}",
-    }
-    
-    # Initial request to check status
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code != 200:
-        raise Exception(f"Error fetching status: {response.text}")
-    
-    data = response.json()
-    tx_status = data.get("tx_status")
-    print(f"Transaction status: {tx_status}")
-    
-    # Retry logic for "Scheduled" status
-    while tx_status not in ["COMPLETED", "Review_required", "FAILED"]:
-        # Wait for the next retry with exponential backoff (doubling the interval)
-        time.sleep(retry_interval)
-        
-        # Exponential backoff (doubling the interval each time), but not exceeding the max retry interval
-        retry_interval = min(retry_interval * 2, max_retry_interval)
-        
-        # Fetch status again
-        response = requests.get(url, headers=headers)
-        
+    """
+    Polls the submission status API until a terminal state is reached
+    and logs progress to Conductor.
+    Returns a dictionary compatible with Conductor task result.
+    """
+    task_id = task.get('taskId') # Get task_id for logging
+    workflow_instance_id = task.get('workflowInstanceId') # Good to have for local logs too
+
+    # Log task start
+    log_message(task_id, f"Task poll_submission_status started. Workflow: {workflow_instance_id}")
+
+    try:
+        input_data = task.get('inputData', {})
+        auth_token = input_data.get("auth_token")
+        tx_id = input_data.get("tx_id")
+
+        if not auth_token:
+            raise ValueError("Missing 'auth_token' in input data")
+        if not tx_id:
+            raise ValueError("Missing 'tx_id' in input data")
+        if not os.getenv("BP_API_KEY"):
+            raise ValueError("Environment variable BP_API_KEY is not set")
+
+        retry_interval_sec = 15  # Start polling interval
+        max_retry_interval_sec = 120 # Max polling interval (e.g., 2 minutes)
+        # Consider adding a total timeout for the polling loop as well
+
+        url = f"https://api-smartdata.di-beta.boldpenguin.com/universal/v4/universal-submit/status/{tx_id}"
+        headers = {
+            "x-api-key": os.getenv("BP_API_KEY"),
+            "Authorization": f"Bearer {auth_token}",
+            "Accept": "application/json" # Good practice to add Accept header
+        }
+
+        log_message(task_id, f"Making initial status request to: {url}")
+        response = requests.get(url, headers=headers, timeout=30) # Add timeout
+
         if response.status_code != 200:
-            raise Exception(f"Error fetching status: {response.text}")
-        
+            error_msg = f"Initial API call failed with status {response.status_code}. Response: {response.text}"
+            log_message(task_id, f"ERROR: {error_msg}")
+            # Fail the task explicitly
+            return {
+                "status": "FAILED",
+                "reasonForIncompletion": error_msg,
+                "logs": [f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - {error_msg}"] # Also add to direct output if needed
+            }
+
         data = response.json()
         tx_status = data.get("tx_status")
-        print(f"Transaction status: {tx_status}")
-    
-    return data  # Return the final status after retries
- 
+        log_message(task_id, f"Initial status received: {tx_status}")
+
+        # Polling loop for non-terminal statuses
+        while tx_status not in ["COMPLETED", "Review_required", "FAILED"]:
+            # Check for None or empty status which might indicate an issue
+            if not tx_status:
+                 log_message(task_id, f"WARNING: Received empty or null tx_status. Current data: {json.dumps(data)}")
+                 # Decide how to handle this - maybe fail after a few tries? For now, continue polling.
+
+            log_message(task_id, f"Status is '{tx_status}'. Waiting {retry_interval_sec}s before next poll.")
+            time.sleep(retry_interval_sec)
+
+            # Exponential backoff, capped at max interval
+            retry_interval_sec = min(retry_interval_sec * 2, max_retry_interval_sec)
+
+            log_message(task_id, f"Making polling status request to: {url}")
+            response = requests.get(url, headers=headers, timeout=30) # Add timeout
+
+            if response.status_code != 200:
+                error_msg = f"Polling API call failed with status {response.status_code}. Response: {response.text}"
+                log_message(task_id, f"ERROR: {error_msg}")
+                # Fail the task explicitly
+                return {
+                    "status": "FAILED",
+                    "reasonForIncompletion": error_msg,
+                    "logs": [f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - {error_msg}"]
+                }
+
+            data = response.json()
+            new_status = data.get("tx_status")
+            log_message(task_id, f"Polled status received: {new_status}")
+
+            # Check if status actually changed to avoid infinite loops on unexpected states
+            if new_status == tx_status:
+                 log_message(task_id, f"WARNING: Status remained '{tx_status}' after polling. Continuing loop.")
+                 # Consider adding logic to break after N attempts with the same status
+
+            tx_status = new_status
+
+        # Loop finished, status is terminal
+        log_message(task_id, f"Polling finished. Final status: {tx_status}. Returning final data.")
+
+        # Return success structure for Conductor
+        return {
+            "status": "COMPLETED",
+            "outputData": data # Return the full final response data
+        }
+
+    except ValueError as ve: # Catch specific configuration/input errors
+        error_msg = f"Configuration or Input Error: {ve}"
+        log_message(task_id, f"FATAL: {error_msg}")
+        # Also print locally for immediate visibility if logging fails
+        print(f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - Task {task_id} FATAL: {error_msg}")
+        return {
+            "status": "FAILED",
+            "reasonForIncompletion": error_msg,
+            "logs": [f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - FATAL: {error_msg}"]
+        }
+    except Exception as e:
+        # Catch any other unexpected errors during execution
+        error_msg = f"Unexpected error during execution: {type(e).__name__} - {e}"
+        log_message(task_id, f"FATAL: {error_msg}")
+        # Also print locally
+        print(f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - Task {task_id} FATAL: {error_msg}")
+        # Include traceback maybe? import traceback; traceback.format_exc()
+        return {
+            "status": "FAILED",
+            "reasonForIncompletion": error_msg,
+            "logs": [f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - FATAL: {error_msg}"]
+        }
  
 def fetch_submission_data(task):
     """
@@ -397,11 +474,11 @@ def send_to_service_now(task):
 
         # data = dummy_response
 
-        response = requests.post(url, headers=headers, json={"parsed_data": data})
+        response = requests.post(url, headers=headers, json=data)
         print(f"Response status: {response.status_code}")
         print(f"Response body: {response.json()}")
 
-        return data
+        return response
 
     except Exception as e:
         print(f"Error sending data to ServiceNow: {e}")
