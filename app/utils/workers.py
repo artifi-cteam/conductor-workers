@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import tempfile
 import time
 import uuid
@@ -303,12 +304,9 @@ def send_to_service_now(task):
         property_insights = agent_output
         loss_insights = agent_output
 
-        # Structured data from fetch_submission_data
-        parsed_data = submission_data.get("structured_data", {})
-
         data = {
             "case_id": case_id,
-            "parsed_data": parsed_data,
+            "parsed_data": dummy_response,
             "insights": {
                 "property_insights": str(property_insights),
                 "loss": str(loss_insights),
@@ -316,7 +314,9 @@ def send_to_service_now(task):
             },
         }
 
-        response = requests.post(url, headers=headers, json=data)
+        data = dummy_response
+
+        response = requests.post(url, headers=headers, json={"parsed_data": dummy_response})
         print(f"Response status: {response.status_code}")
         print(f"Response body: {response.json()}")
 
