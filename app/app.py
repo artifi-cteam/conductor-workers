@@ -29,10 +29,11 @@ def home():
 
 @app.route('/start-workflow', methods=['POST'])
 def start_workflow():
+    if 'file' not in request.files:
+        return 'No file part', 400
     print("Starting workflow...")
-    print(request)
-    file = request.files['file']
-    case_id = request.form.get('case_id')
+    case_id = request.form['case_id']
+    file = request.files['file']  # this should now work if sent as form-data
     file_content = file.read()
     filename = file.filename
 
