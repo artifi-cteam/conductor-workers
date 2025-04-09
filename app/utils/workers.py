@@ -1,5 +1,8 @@
+from datetime import datetime
 import tempfile
 import time
+import uuid
+from app.utils.dummy_response import dummy_response
 from conductor.client.automator.task_handler import TaskHandler
 from conductor.client.configuration.configuration import Configuration
 from conductor.client.configuration.configuration import AuthenticationSettings
@@ -7,8 +10,7 @@ from conductor.client.worker.worker import Worker
 from dotenv import load_dotenv
 import os
 import requests
- 
-from app.service.mongo_service import save_report_data
+from app.service.mongo_service import save_report_data, client
 from app.utils.parsers import (
     parse_advanced_property,
     parse_auto,
@@ -18,6 +20,9 @@ from app.utils.parsers import (
 )
  
 load_dotenv(override=True)
+
+print("Starting worker...")
+start = time.time()
  
 # Conductor API URL
 API_URL = os.getenv('CONDUCTOR_URL')
@@ -259,14 +264,21 @@ def fetch_submission_data(task):
 
     return structured_response
 
-def send_to_agent_service(task):
-    
-    input_data = task.input_data
-    print(input_data)
+def call_agent_service(task):
+    input_data = task.input_data.get("submission_data")
+    print(f"Calling agent service for {input_data}")
 
     filtered_data = {key: input_data[key] for key in ["Common", "Property", "Advanced Property"]}
 
-    # Call agent service:
+    response = requests.post(
+        'http://34.229.60.129:31480/query',
+        json={
+           "message": str(filtered_data)
+          }  # use `json=` instead of `str()`
+    )
+
+    # Return parsed JSON or text content
+    return response.json()  # or `response.text` if not JSON
 
     # Call agent service with whole data:
 
@@ -274,68 +286,84 @@ def send_to_agent_service(task):
 
 def send_to_service_now(task):
     input_data = task.input_data
-    print(input_data)
+    print(f"Sending the data to service now: {input_data}")
 
     url = "https://elevatenowtechdemo1.service-now.com/api/x_elete_ins/load_package/commons"
     headers = {"Content-Type": "application/json"}
 
-    # Mocked agent data instead of querying the database
-    agent_data = {
-        "Appetite": "Mocked Appetite Data",
-        "PropertyInsights": "Mocked Property Insights",
-        "LossInsights": "Mocked Loss Insights"
-    }
+    try:
+        # Extract actual input parameters
+        case_id = input_data.get("case_id")
+        tx_id = input_data.get("tx_id")
+        agent_output = input_data.get("agent_output", {})
+        submission_data = input_data.get("submission_data", {})
 
-    appetite = agent_data.get("Appetite", "")
-    property_insights = agent_data.get("PropertyInsights", "")
-    loss_insights = agent_data.get("LossInsights", "")
+        # Extract insights from agent_output
+        appetite = agent_output
+        property_insights = agent_output
+        loss_insights = agent_output
 
-    # Mocked BP data instead of querying the database
-    bp_data = {
-        "artifi_id": "mocked_artifi_id",
-        "structured_data": {"mocked_key": "mocked_value"}
-    }
-    artifi_id = bp_data.get("artifi_id")
+        # Structured data from fetch_submission_data
+        parsed_data = submission_data.get("structured_data", {})
 
-    # Mocked case ID instead of querying the database
-    case_id_row = {"case_id": "MOCKED_CASE_ID"}
-    case_id = case_id_row.get("case_id")
+        data = {
+            "case_id": case_id,
+            "parsed_data": parsed_data,
+            "insights": {
+                "property_insights": str(property_insights),
+                "loss": str(loss_insights),
+                "appetite": str(appetite),
+            },
+        }
 
-    print(bp_data)
-    print(case_id)
+        response = requests.post(url, headers=headers, json=data)
+        print(f"Response status: {response.status_code}")
+        print(f"Response body: {response.json()}")
 
-    parsed_data = bp_data.get("structured_data", {})
+        return data
 
-    data = {
-        "case_id": case_id,
-        "parsed_data": parsed_data,
-        "insights": {
-            "property_insights": str(property_insights),
-            "loss": str(loss_insights),
-            "appetite": str(appetite),
-        },
-    }
+    except Exception as e:
+        print(f"Error sending data to ServiceNow: {e}")
+        raise
 
-    # Actual API request
-    response = requests.post(url, headers=headers, json=data)
-
-    print(response.status_code)
-    print(response.json())
-
-    return data
 
 
 
 def push_to_mongo(task):
     input_data = task.input_data
     print(input_data)
-    tx_id = input_data.get("tx_id","")
-    report_data = input_data.get("report_id","")
-    artifi_id = "TEST001"
 
-    # save_report_data(report_data, artifi_id, tx_id)
+    db = client["Submission_Intake"]
+    tx_id = input_data.get("tx_id", "")
+    case_id = input_data.get("case_id", "")
+    file_data = input_data.get("file", "")
+    submission_data = input_data.get("submission_data", {})
+    agent_response = input_data.get("agent_output", {})
 
-    
+    artifi_id = str(uuid.uuid4())
+    timestamp = datetime.now()
+
+    # BP_DATA
+    bp_data_doc = {
+        "artifi_id": artifi_id,
+        "case_id": case_id,
+        "file_data": file_data,
+        "created_at": timestamp
+    }
+    db["BP_DATA"].insert_one(bp_data_doc)
+
+    # BP_service
+    report_data = submission_data
+    save_report_data(report_data, artifi_id, tx_id)  # This already adds timestamp inside
+
+    # AGENT_RESPONSES
+    agent_response_doc = {
+        "artifi_id": artifi_id,
+        "agent_response": agent_response,
+        "created_at": timestamp
+    }
+    db["AGENT_RESPONSES"].insert_one(agent_response_doc)
+ 
  
 # Register Workers
 worker_auth = Worker(
@@ -364,19 +392,24 @@ worker_callback = Worker(
 )
 worker_send_to_service_now = Worker(
     task_definition_name = "send_to_service_now",
-    execution_function = send_to_service_now
+    execute_function = send_to_service_now
+)
+worker_call_agent_service = Worker(
+    task_definition_name = "call_agent_service",
+    execute_function = call_agent_service
+)
+worker_push_to_mongo = Worker(
+    task_definition_name = "push_to_mongo",
+    execute_function = push_to_mongo
 )
  
 handler = TaskHandler(
     configuration=config,
     workers=[
-        worker_callback,
-        worker_auth,
-        worker_get_upload_url,
-        worker_upload_file,
-        worker_trigger_processing,
-        worker_poll_submission_status,
-        worker_fetch_submission_data,
+        worker_call_agent_service,
+        worker_send_to_service_now,
+        worker_push_to_mongo
     ],
 )
 handler.start_processes()
+print(f"Worker started in {time.time() - start:.2f}s")

@@ -47,8 +47,8 @@ def fetch_case_files(case_id):
 
 def save_report_data(report_data, artifi_id, tx_id):
     """Saves report data into MongoDB with mapped fields."""
-    if not report_data or len(report_data) != len(DATA_PACKAGE_IDS):
-        raise ValueError("Report data is missing or does not match expected structure")
+    if not report_data:
+        raise ValueError("Report data is missing")
 
     report_doc = {
         "artifi_id": artifi_id,
@@ -56,10 +56,11 @@ def save_report_data(report_data, artifi_id, tx_id):
         "created_on": datetime.now(),
     }
 
-    # Map data package IDs to report data fields
-    for idx, col_name in enumerate(DATA_PACKAGE_IDS):
-        report_doc[col_name] = report_data[idx]
+    print(report_data)
+    print(type(report_data))
 
-    # Insert into MongoDB
+    for col_name in DATA_PACKAGE_IDS:
+        report_doc[col_name] = report_data.get(col_name, None)
+
     bp_collection.insert_one(report_doc)
     print(f"Report data for tx_id {tx_id} saved successfully")
