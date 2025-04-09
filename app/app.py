@@ -30,17 +30,20 @@ def home():
 @app.route('/start-workflow', methods=['POST'])
 def start_workflow():
     print("Starting workflow...")
+    print(request)
     file = request.files['file']
+    case_id = request.form.get('case_id')
     file_content = file.read()
     filename = file.filename
 
     workflow_input = {
-        "file": file_content.decode('utf-8'),
-        "filename": filename
+        "case_id": case_id,
+        "filename": filename,
+        "file": file_content.decode('utf-8')
     }
     payload = {
         "name": WORKFLOW_NAME,
-        "version": 2,
+        "version": 7,
         "input": workflow_input
     }
     
