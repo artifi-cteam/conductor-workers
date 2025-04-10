@@ -43,7 +43,7 @@ def start_workflow():
     workflow_input = {
         "case_id": case_id,
         "filename": filename,
-        "file": decoded_bytes.decode('utf-8')
+        "file": decoded_bytes
     }
     payload = {
         "name": WORKFLOW_NAME,
