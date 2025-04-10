@@ -1,3 +1,4 @@
+import base64
 import json
 import time
 import os
@@ -37,10 +38,12 @@ def start_workflow():
     file_content = file.read()
     filename = file.filename
 
+    decoded_bytes = base64.b64decode(file_content)
+
     workflow_input = {
         "case_id": case_id,
         "filename": filename,
-        "file": file_content.decode('utf-8')
+        "file": decoded_bytes.decode('utf-8')
     }
     payload = {
         "name": WORKFLOW_NAME,
