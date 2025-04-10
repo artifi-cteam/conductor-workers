@@ -387,10 +387,10 @@ def fetch_submission_data(task):
 
 def call_agent_service(task):
     try:
-        input_data = task.input_data.get("submission_data")
-        print(f"Calling agent service for {input_data}")
+        # input_data = task.input_data.get("submission_data")
+        # print(f"Calling agent service for {input_data}")
 
-        filtered_data = {key: input_data[key] for key in ["Common", "Property", "Advanced Property"]}
+        # filtered_data = {key: input_data[key] for key in ["Common", "Property", "Advanced Property"]}
 
         # response = requests.post(
         #     'http://34.229.60.129:31480/query',
