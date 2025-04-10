@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime, timezone
 import json
 import tempfile
@@ -48,22 +49,19 @@ config = Configuration(
 )
 
 def wait_for_file_upload(task):
-    # Directly receive file from workflow input
     file = task.input_data.get('file')
     filename = task.input_data.get('filename')
-    
-    # Validate file
+
     if not file or not filename:
         raise ValueError("No file or filename provided")
-    
-    # Prepare output data with file details
+
     output_data = {
         "filename": filename,
-        "file_content": file,  # Pass entire file content if needed
+        "file_content": file,
         "file_size": len(file),
         "validation_status": "success"
     }
-    
+
     return output_data
  
 # Worker for retrieving auth token
@@ -231,11 +229,6 @@ def poll_submission_status(task):
     Polls the submission status API until a terminal state is reached,
     using exponential backoff (max delay 120 seconds), and logs progress.
     """
-    from datetime import datetime, timezone
-    import json, os, time, requests
-
-    def log_message(task_id, message):
-        print(f"{datetime.now(timezone.utc).isoformat()} [Task {task_id}] {message}")
 
     task_id = task.task_id
     workflow_instance_id = task.workflow_instance_id
