@@ -1,5 +1,5 @@
 # --- Logging Helper Function ---
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 
 import requests
@@ -10,9 +10,9 @@ def log_message(task_id, message):
     if not task_id:
         print(f"WARNING: task_id not provided. Log message: {message}")
         return
+    timestamp = datetime.now(timezone.utc).isoformat()
+    log_entry = f"{timestamp} - {message}"
     try:
-        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        log_entry = f"{timestamp} - {message}"
         # Use a timeout for the request
         response = requests.post(
             f"{os.getenv("CONDUCTOR_URL")}/tasks/{task_id}/log",
