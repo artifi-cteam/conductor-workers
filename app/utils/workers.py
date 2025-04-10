@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import tempfile
 import time
@@ -228,18 +228,21 @@ def trigger_processing(task):
  
 def poll_submission_status(task):
     """
-    Polls the submission status API until a terminal state is reached
-    and logs progress to Conductor.
-    Returns a dictionary compatible with Conductor task result.
+    Polls the submission status API until a terminal state is reached,
+    using exponential backoff (max delay 120 seconds), and logs progress.
     """
-    task_id = task.get('taskId') # Get task_id for logging
-    workflow_instance_id = task.get('workflowInstanceId') # Good to have for local logs too
+    from datetime import datetime, timezone
+    import json, os, time, requests
 
-    # Log task start
+    def log_message(task_id, message):
+        print(f"{datetime.now(timezone.utc).isoformat()} [Task {task_id}] {message}")
+
+    task_id = task.task_id
+    workflow_instance_id = task.workflow_instance_id
     log_message(task_id, f"Task poll_submission_status started. Workflow: {workflow_instance_id}")
 
     try:
-        input_data = task.get('inputData', {})
+        input_data = task.input_data
         auth_token = input_data.get("auth_token")
         tx_id = input_data.get("tx_id")
 
@@ -250,103 +253,73 @@ def poll_submission_status(task):
         if not os.getenv("BP_API_KEY"):
             raise ValueError("Environment variable BP_API_KEY is not set")
 
-        retry_interval_sec = 15  # Start polling interval
-        max_retry_interval_sec = 120 # Max polling interval (e.g., 2 minutes)
-        # Consider adding a total timeout for the polling loop as well
-
+        retry_interval_sec = 60  # initial polling interval (seconds)
+        max_retry_interval_sec = 120  # max polling interval (seconds)
         url = f"https://api-smartdata.di-beta.boldpenguin.com/universal/v4/universal-submit/status/{tx_id}"
         headers = {
             "x-api-key": os.getenv("BP_API_KEY"),
             "Authorization": f"Bearer {auth_token}",
-            "Accept": "application/json" # Good practice to add Accept header
+            "Accept": "application/json"
         }
 
         log_message(task_id, f"Making initial status request to: {url}")
-        response = requests.get(url, headers=headers, timeout=30) # Add timeout
-
+        response = requests.get(url, headers=headers, timeout=30)
         if response.status_code != 200:
-            error_msg = f"Initial API call failed with status {response.status_code}. Response: {response.text}"
-            log_message(task_id, f"ERROR: {error_msg}")
-            # Fail the task explicitly
+            error_msg = f"Initial API call failed with status {response.status_code}: {response.text}"
+            log_message(task_id, error_msg)
             return {
                 "status": "FAILED",
                 "reasonForIncompletion": error_msg,
-                "logs": [f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - {error_msg}"] # Also add to direct output if needed
+                "logs": [f"{datetime.now(timezone.utc).isoformat()} - {error_msg}"]
             }
 
         data = response.json()
         tx_status = data.get("tx_status")
         log_message(task_id, f"Initial status received: {tx_status}")
 
-        # Polling loop for non-terminal statuses
+        # Continue polling until a terminal state is reached
         while tx_status not in ["COMPLETED", "Review_required", "FAILED"]:
-            # Check for None or empty status which might indicate an issue
-            if not tx_status:
-                 log_message(task_id, f"WARNING: Received empty or null tx_status. Current data: {json.dumps(data)}")
-                 # Decide how to handle this - maybe fail after a few tries? For now, continue polling.
-
-            log_message(task_id, f"Status is '{tx_status}'. Waiting {retry_interval_sec}s before next poll.")
+            log_message(task_id, f"Current status '{tx_status}'. Sleeping for {retry_interval_sec}s.")
             time.sleep(retry_interval_sec)
-
-            # Exponential backoff, capped at max interval
-            retry_interval_sec = min(retry_interval_sec * 2, max_retry_interval_sec)
-
-            log_message(task_id, f"Making polling status request to: {url}")
-            response = requests.get(url, headers=headers, timeout=30) # Add timeout
-
+            log_message(task_id, f"Polling status request to: {url}")
+            response = requests.get(url, headers=headers, timeout=30)
             if response.status_code != 200:
-                error_msg = f"Polling API call failed with status {response.status_code}. Response: {response.text}"
-                log_message(task_id, f"ERROR: {error_msg}")
-                # Fail the task explicitly
+                error_msg = f"Polling API call failed with status {response.status_code}: {response.text}"
+                log_message(task_id, error_msg)
                 return {
                     "status": "FAILED",
                     "reasonForIncompletion": error_msg,
-                    "logs": [f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - {error_msg}"]
+                    "logs": [f"{datetime.now(timezone.utc).isoformat()} - {error_msg}"]
                 }
-
             data = response.json()
             new_status = data.get("tx_status")
             log_message(task_id, f"Polled status received: {new_status}")
-
-            # Check if status actually changed to avoid infinite loops on unexpected states
-            if new_status == tx_status:
-                 log_message(task_id, f"WARNING: Status remained '{tx_status}' after polling. Continuing loop.")
-                 # Consider adding logic to break after N attempts with the same status
-
             tx_status = new_status
+            retry_interval_sec = min(retry_interval_sec * 2, max_retry_interval_sec)
 
-        # Loop finished, status is terminal
-        log_message(task_id, f"Polling finished. Final status: {tx_status}. Returning final data.")
-
-        # Return success structure for Conductor
+        log_message(task_id, f"Polling finished. Final status: {tx_status}.")
         return {
             "status": "COMPLETED",
-            "outputData": data # Return the full final response data
+            "outputData": data
         }
 
-    except ValueError as ve: # Catch specific configuration/input errors
-        error_msg = f"Configuration or Input Error: {ve}"
-        log_message(task_id, f"FATAL: {error_msg}")
-        # Also print locally for immediate visibility if logging fails
-        print(f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - Task {task_id} FATAL: {error_msg}")
+    except ValueError as ve:
+        error_msg = f"Configuration/Input Error: {ve}"
+        log_message(task_id, error_msg)
         return {
             "status": "FAILED",
             "reasonForIncompletion": error_msg,
-            "logs": [f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - FATAL: {error_msg}"]
+            "logs": [f"{datetime.now(timezone.utc).isoformat()} - {error_msg}"]
         }
     except Exception as e:
-        # Catch any other unexpected errors during execution
-        error_msg = f"Unexpected error during execution: {type(e).__name__} - {e}"
-        log_message(task_id, f"FATAL: {error_msg}")
-        # Also print locally
-        print(f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - Task {task_id} FATAL: {error_msg}")
-        # Include traceback maybe? import traceback; traceback.format_exc()
+        error_msg = f"Unexpected error: {type(e).__name__} - {e}"
+        log_message(task_id, error_msg)
         return {
             "status": "FAILED",
             "reasonForIncompletion": error_msg,
-            "logs": [f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} - FATAL: {error_msg}"]
+            "logs": [f"{datetime.now(timezone.utc).isoformat()} - {error_msg}"]
         }
- 
+
 def fetch_submission_data(task):
     """
     Fetches submission data for a list of dp_ids and a single report_id.
