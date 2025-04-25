@@ -224,8 +224,8 @@ def poll_submission_status(task):
         if not os.getenv("BP_API_KEY"):
             raise ValueError("Environment variable BP_API_KEY is not set")
 
-        retry_interval_sec = 120  # initial polling interval (seconds)
-        max_retry_interval_sec = 120  # max polling interval (seconds)
+        retry_interval_sec = 180  # initial polling interval (seconds)
+        max_retry_interval_sec = 180  # max polling interval (seconds)
         url = f"https://api-smartdata.di-beta.boldpenguin.com/universal/v4/universal-submit/status/{tx_id}"
         headers = {
             "x-api-key": os.getenv("BP_API_KEY"),

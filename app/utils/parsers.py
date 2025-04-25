@@ -2,8 +2,8 @@ import json
  
  
 def parse_us_common(json_data):
-    data = json_data.get("data", {})
-    scores = json_data.get("scores", {})
+    data = json_data.get("data", [{}])[0]
+    scores = data.get("scores", {})
  
     def add_scores(section):
         """Helper function to merge values with their respective scores if available."""
@@ -26,6 +26,8 @@ def parse_us_common(json_data):
  
     # Extracting Broker Details with scores
     options = data.get("options", {})
+    misc = data.get("cleansed_input", {})
+
     broker_details = add_scores(
         {
             "broker_name": options.get("broker_name", ""),
@@ -36,6 +38,7 @@ def parse_us_common(json_data):
             "broker_contact_points": options.get("broker_contact_points", ""),
             "broker_email": options.get("broker_email", ""),
             "broker_contact_phone": options.get("broker_contact_phone", ""),
+            "submission_received_date": options.get("submission_received_date", "")
         }
     )
  
@@ -67,15 +70,17 @@ def parse_us_common(json_data):
                 "normalized_coverage", []
             ),  # Lists remain unchanged
             "coverage": options.get("coverage", []),  # Lists remain unchanged
+            "coverage_details": json_data.get("additional_data")
         }
     )
  
     # Returning the structured data
     structured_data = {
         "Firmographics": firmographics,
-        "Broker Details": broker_details,
-        "Product Details": product_details,
-        "Limits and Coverages": limits_and_coverages,
+        "Broker_Details": broker_details,
+        "Product_Details": product_details,
+        "Limits_and_Coverages": limits_and_coverages,
+        "Legal_Entity_Type": ""
     }
  
     return structured_data
@@ -211,10 +216,11 @@ def parse_advanced_property(input_json):
 def parse_general_liability(gl_json):
     data = gl_json
  
-    facts = data["data"].get("facts", {})
-    options = data["data"].get("options", {})
-    scores = data.get("scores", {})
- 
+    first_item = data.get("data", [{}])[0]
+    facts = first_item.get("facts", {})
+    options = first_item.get("options", {})
+    scores = first_item.get("scores", {})
+
     # Process gl_facts with scores
     gl_facts = {
         key: {"value": value, "score": scores.get(key, "")}
@@ -234,22 +240,19 @@ def parse_general_liability(gl_json):
  
 def parse_auto(auto_json):
     data = auto_json
- 
-    facts = data["data"].get("facts", {})
-    scores = data.get("scores", {})
- 
+    first_item = data.get("data", [{}])[0]  # Safely get first dict from list
+
+    facts = first_item.get("facts", {})
+    scores = first_item.get("scores", {})
+
     auto_facts = {}
- 
-    # Convert facts into the required format
+
     for key, value in facts.items():
-        if isinstance(value, dict) or isinstance(value, list):
+        if isinstance(value, (dict, list)):
             auto_facts[key] = {"value": value, "score": scores.get(key, "")}
         else:
-            auto_facts[key] = {
-                "value": str(value),  # Ensuring everything is string for consistency
-                "score": scores.get(key, ""),
-            }
- 
-    transformed_auto = {"Auto": {"auto_facts": auto_facts}}
+            auto_facts[key] = {"value": str(value), "score": scores.get(key, "")}
+
+    return {"Auto": {"auto_facts": auto_facts}}
  
     return transformed_auto
