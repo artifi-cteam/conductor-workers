@@ -26,32 +26,7 @@ def craft_agent_config(agent_data):
             "system_message": cfg.get("system_message", ""),
             "tools": cfg.get("tools", []),
             "category": cfg.get("category", ""),
-             "structured_output": {
-                "type": "object",
-                "properties": {
-                    "result": {
-                        "type": "string",
-                        "description": "The main result of the query"
-                    },
-                    "metadata": {
-                        "type": "object",
-                        "properties": {
-                            "source": {
-                                "type": "string"
-                            },
-                            "confidence": {
-                                "type": "number"
-                              }
-                        },
-                        "required": [
-                            "source"
-                        ]
-                    }
-                },
-                "required": [
-                    "result"
-                ]
-            },
+            "structured_output": cfg.get("structured_output"),
             "knowledge_base": {
                 "id": kb.get("id", ""),
                 "name": kb.get("name", ""),
