@@ -138,7 +138,7 @@ def call_agent_service(task):
                         "message": str(submission_data),
                         "thread_id": thread_id
                     },
-                    timeout=30
+                    timeout=180
                 )
                 results[agent_name] = response.json()
             except Exception as e:
