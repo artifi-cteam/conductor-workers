@@ -1,3 +1,4 @@
+import json
 import requests
 from app.utils.conductor_logger import log_message
 from app.service.mongo_service import save_report_data, client
@@ -15,6 +16,13 @@ def craft_agent_config(agent_data):
     cfg = agent_data.get("Configuration", {})
     kb = agent_data.get("selectedKnowledgeBase")
 
+    raw = cfg.get("structured_output", "{}")
+    try:
+        structured = json.loads(raw)
+    except json.JSONDecodeError:
+        structured = {}
+
+
     agent_config = {
         "AgentID": agent_data.get("AgentID", ""),
         "AgentName": agent_data.get("AgentName", ""),
@@ -26,7 +34,7 @@ def craft_agent_config(agent_data):
             "system_message": cfg.get("system_message", ""),
             "tools": cfg.get("tools", []),
             "category": cfg.get("category", ""),
-            "structured_output": cfg.get("structured_output"),
+            "structured_output": structured,
             "knowledge_base": {
                 "id": kb.get("id", ""),
                 "name": kb.get("name", ""),
