@@ -1,5 +1,6 @@
 from datetime import time
 import json
+import random
 import requests
 from app.utils.conductor_logger import log_message
 from app.service.mongo_service import save_report_data, client
@@ -126,8 +127,8 @@ def call_agent_service(task):
     try:
         input_data = task.input_data
         submission_data = input_data.get("submission_data", {})
-        thread_id = input_data.get("thread_id", 1)
-
+        thread_id = input_data.get("thread_id", random.randint(1, 100000))
+        
         db = client["Agent_Database"]
         collection = db["AgentCatalog"]
 
@@ -148,7 +149,7 @@ def call_agent_service(task):
                         "message": str(submission_data),
                         "thread_id": thread_id
                     },
-                    timeout=180
+                    timeout=300
                 )
                 results[agent_name] = response.json()
             except Exception as e:
