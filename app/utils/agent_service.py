@@ -32,9 +32,6 @@ def craft_agent_config(agent_data):
     else:
         structured = raw.get("structured_output", raw)
 
-    print(structured)
-    print(type(structured))
-
     agent_config = {
         "AgentID": agent_data.get("AgentID", ""),
         "AgentName": agent_data.get("AgentName", ""),
@@ -128,6 +125,7 @@ def call_agent_service(task):
         input_data = task.input_data
         submission_data = input_data.get("submission_data", {})
         thread_id = input_data.get("thread_id", random.randint(1, 100000))
+
         
         db = client["Agent_Database"]
         collection = db["AgentCatalog"]
@@ -140,6 +138,7 @@ def call_agent_service(task):
             agent_id = agent.get("AgentID")
             agent_name = agent.get("AgentName", agent_id)  # fallback to ID if name missing
             agent_config = craft_agent_config(agent)
+            log_message(task_id,f"agent config is: {agent_config}")
 
             try:
                 response = requests.post(
