@@ -57,6 +57,7 @@ def parse_us_common(json_data):
             "workers_comp_estimated_annual_payroll": options.get(
                 "workers_comp_estimated_annual_payroll", ""
             ),
+            "document_date": options.get("document_date", ""),
             "expiring_premium": options.get("expiring_premium", ""),
             "lob": options.get("lob", ""),
         }
