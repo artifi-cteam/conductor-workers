@@ -1,27 +1,38 @@
+from datetime import time
 import json
 import requests
 from app.utils.conductor_logger import log_message
 from app.service.mongo_service import save_report_data, client
 
 TARGET_AGENT_IDS = {
-    "cb8d305d7cf54bbbbf0490787079dbcb",  # ExposureInsight
     "a9b0250c-0e6c-45a2-9214-0441af43b36a",  # LossInsight
+    "cb8d305d7cf54bbbbf0490787079dbcb",  # ExposureInsight
     "48e0fde3-2c69-44f0-98d6-b6a5b031c2bb",  # EligibilityCheck
     "6097c379-9637-4198-abad-a9d5416fb650",  # InsuranceVerify
     "8c72ba1d-9403-4782-8f8c-12564ab73f9c",  # PropEval
     "383daaad-4b46-491b-b987-9dd17d430ca3"   # BusineesProfileSearch
 }
 
+import json
+
 def craft_agent_config(agent_data):
     cfg = agent_data.get("Configuration", {})
     kb = agent_data.get("selectedKnowledgeBase")
-
+    toggle = cfg.get("structured_output_toggle", False)
     raw = cfg.get("structured_output", "{}")
-    try:
-        structured = json.loads(raw)
-    except json.JSONDecodeError:
-        structured = {}
 
+    if not toggle:
+        structured = {}
+    elif isinstance(raw, bool) and not raw:
+        structured = None
+    elif isinstance(raw, str):
+        structured = json.loads(raw)
+        structured = structured.get("structured_output", structured)
+    else:
+        structured = raw.get("structured_output", raw)
+
+    print(structured)
+    print(type(structured))
 
     agent_config = {
         "AgentID": agent_data.get("AgentID", ""),
@@ -44,7 +55,6 @@ def craft_agent_config(agent_data):
                 "description": kb.get("description", ""),
                 "number_of_chunks": 5
             } if kb else {}
-            
         },
         "isManagerAgent": agent_data.get("isManagerAgent", False),
         "selectedManagerAgents": agent_data.get("selectedManagerAgents", []),
@@ -143,7 +153,6 @@ def call_agent_service(task):
                 results[agent_name] = response.json()
             except Exception as e:
                 results[agent_name] = {"error": str(e)}
-
 
         return results
 
