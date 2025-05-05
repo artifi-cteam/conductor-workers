@@ -86,11 +86,10 @@ def call_agent_service_rerun(task):
     collection = db["BP_DATA"]
     mongo_doc     = collection.find_one({"case_id": case_id}) or {}
     submission_data = mongo_doc.get("submission_data", {})
-    print(submission_data)
 
     # 2) merge
     merged_data = {**submission_data, **modified_data}
-    thread_id   = input_data.get("thread_id", 1)
+    thread_id = input_data.get("thread_id", random.randint(1, 100000))
 
     # 3) call each agent
     results = {}
@@ -101,10 +100,11 @@ def call_agent_service_rerun(task):
         name   = agent.get("AgentName", agent["AgentID"])
         config = craft_agent_config(agent)
         try:
+            log_message(task_id, f"Calling the agent {name}")
             resp = requests.post(
                 "http://34.224.79.136:8000/query",
                 json={"agent_config": config, "message": str(merged_data), "thread_id": thread_id},
-                timeout=30
+                timeout=300
             )
             results[name] = resp.json()
         except Exception as e:
