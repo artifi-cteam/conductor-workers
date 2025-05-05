@@ -106,6 +106,7 @@ def call_agent_service_rerun(task):
                 json={"agent_config": config, "message": str(merged_data), "thread_id": thread_id},
                 timeout=300
             )
+            log_message(task_id,f"agent config: {config} \nresponse: {resp.json()}")
             results[name] = resp.json()
         except Exception as e:
             results[name] = {"error": str(e)}
