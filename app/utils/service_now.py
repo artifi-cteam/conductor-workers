@@ -21,7 +21,6 @@ def send_to_service_now_rerun_worker(task):
 
     payload = {
         "case_id":      case_id,
-        "parsed_data":  submission_data,
         "insights": agent_output,
         "update": True
     }

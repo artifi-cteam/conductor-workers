@@ -1,3 +1,4 @@
+import copy
 from datetime import time
 import json
 import random
@@ -21,6 +22,14 @@ AGENT_PROMPTS = {
     "PropEval":          "Please provide Property evaluation insights for the JSON.",
     "BusineesProfileSearch": "Please search the business profile based on the JSON.",
 }
+
+def deep_update(original, updates):
+    for k, v in updates.items():
+        if isinstance(v, dict) and isinstance(original.get(k), dict):
+            deep_update(original[k], v)
+        else:
+            original[k] = v
+    return original
 
 import json
 
@@ -94,7 +103,7 @@ def call_agent_service_rerun(task):
     submission    = mongo_doc.get("submission_data", {})
 
     # 2) merge
-    merged_data = {**submission, **modified_data}
+    merged_data = deep_update(copy.deepcopy(submission), modified_data)
     thread_id   = input_data.get("thread_id", random.randint(1, 100000))
 
     # 3) call each agent with its suffix prompt
@@ -108,7 +117,11 @@ def call_agent_service_rerun(task):
 
         # pick suffix and build full message
         suffix       = AGENT_PROMPTS.get(name, "")
-        full_message = f"{merged_data} {suffix}".strip()
+        full_message = (
+            f"Original Data was : {str(submission)}The following fields were modified:\n"
+            + "\n".join(modified_data) +
+            f"\n\nUse the updated values in processing.\n\n{suffix}"
+        )
 
         try:
             log_message(task_id, f"Calling {name} with message: {full_message}")
