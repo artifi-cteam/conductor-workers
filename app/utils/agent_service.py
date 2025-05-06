@@ -13,6 +13,14 @@ TARGET_AGENT_IDS = {
     "8c72ba1d-9403-4782-8f8c-12564ab73f9c",  # PropEval
     "383daaad-4b46-491b-b987-9dd17d430ca3"   # BusineesProfileSearch
 }
+AGENT_PROMPTS = {
+    "LossInsight":       "Please provide loss insights for the JSON.",
+    "ExposureInsight":   "Please provide exposure insights for the JSON.",
+    "EligibilityCheck":  "Please check eligibility based on the JSON.",
+    "InsuranceVerify":   "Please verify insurance details in the JSON.",
+    "PropEval":          "Please provide Property evaluation insights for the JSON.",
+    "BusineesProfileSearch": "Please search the business profile based on the JSON.",
+}
 
 import json
 
@@ -75,38 +83,44 @@ def craft_agent_config(agent_data):
     return agent_config
 
 def call_agent_service_rerun(task):
-    task_id    = task.task_id
-    input_data = task.input_data
+    task_id       = task.task_id
+    input_data    = task.input_data or {}
     log_message(task_id, "Rerun: pull + call agents")
 
     # 1) pull from Mongo
     case_id       = input_data.get("case_id")
     modified_data = input_data.get("modified_data", {})
-    db = client["Submission_Intake"]
-    collection = db["BP_DATA"]
-    mongo_doc     = collection.find_one({"case_id": case_id}) or {}
-    submission_data = mongo_doc.get("submission_data", {})
+    mongo_doc     = client["Submission_Intake"]["BP_DATA"].find_one({"case_id": case_id}) or {}
+    submission    = mongo_doc.get("submission_data", {})
 
     # 2) merge
-    merged_data = {**submission_data, **modified_data}
-    thread_id = input_data.get("thread_id", random.randint(1, 100000))
+    merged_data = {**submission, **modified_data}
+    thread_id   = input_data.get("thread_id", random.randint(1, 100000))
 
-    # 3) call each agent
+    # 3) call each agent with its suffix prompt
     results = {}
-    db = client["Agent_Database"]
-    collection = db["AgentCatalog"]
-    agents = collection.find({"AgentID": {"$in": list(TARGET_AGENT_IDS)}})
+    agents = client["Agent_Database"]["AgentCatalog"].find(
+        {"AgentID": {"$in": list(TARGET_AGENT_IDS)}}
+    )
     for agent in agents:
         name   = agent.get("AgentName", agent["AgentID"])
         config = craft_agent_config(agent)
+
+        # pick suffix and build full message
+        suffix       = AGENT_PROMPTS.get(name, "")
+        full_message = f"{merged_data} {suffix}".strip()
+
         try:
-            log_message(task_id, f"Calling the agent {name}")
+            log_message(task_id, f"Calling {name} with message: {full_message}")
             resp = requests.post(
                 "http://34.224.79.136:8000/query",
-                json={"agent_config": config, "message": str(merged_data), "thread_id": thread_id},
+                json={
+                    "agent_config": config,
+                    "message":      full_message,
+                    "thread_id":    thread_id
+                },
                 timeout=300
             )
-            # log_message(task_id,f"agent config: {config['Configuration']} \nresponse: {resp.json()}")
             results[name] = resp.json()
         except Exception as e:
             results[name] = {"error": str(e)}
@@ -119,45 +133,41 @@ def call_agent_service_rerun(task):
         }
     }
 
-
 def call_agent_service(task):
-    task_id = task.task_id
-    try:
-        input_data = task.input_data
-        submission_data = input_data.get("submission_data", {})
-        thread_id = input_data.get("thread_id", random.randint(1, 100000))
+    task_id    = task.task_id
+    input_data = task.input_data or {}
+    submission = input_data.get("submission_data", {})
+    thread_id  = input_data.get("thread_id", random.randint(1,100000))
 
-        
-        db = client["Agent_Database"]
-        collection = db["AgentCatalog"]
+    db         = client["Agent_Database"]
+    collection = db["AgentCatalog"]
+    agents     = collection.find({"AgentID": {"$in": list(TARGET_AGENT_IDS)}})
 
-        agents = collection.find({"AgentID": {"$in": list(TARGET_AGENT_IDS)}})
+    results = {}
+    for agent in agents:
+        agent_id   = agent["AgentID"]
+        agent_name = agent.get("AgentName", agent_id)
+        agent_cfg  = craft_agent_config(agent)
 
-        results = {}
+        # pick the suffix prompt for this agent (default empty)
+        suffix = AGENT_PROMPTS.get(agent_name, "")
+        # build the message
+        full_message = f"{submission} {suffix}".strip()
 
-        for agent in agents:
-            agent_id = agent.get("AgentID")
-            agent_name = agent.get("AgentName", agent_id)  # fallback to ID if name missing
-            agent_config = craft_agent_config(agent)
-            log_message(task_id,f"agent config is: {agent_config}")
+        log_message(task_id, f"sending to {agent_name!r}: {full_message!r}")
 
-            try:
-                response = requests.post(
-                    "http://34.224.79.136:8000/query",
-                    json={
-                        "agent_config": agent_config,
-                        "message": str(submission_data),
-                        "thread_id": thread_id
-                    },
-                    timeout=300
-                )
-                results[agent_name] = response.json()
-            except Exception as e:
-                results[agent_name] = {"error": str(e)}
+        try:
+            r = requests.post(
+                "http://34.224.79.136:8000/query",
+                json={
+                    "agent_config": agent_cfg,
+                    "message":      full_message,
+                    "thread_id":    thread_id
+                },
+                timeout=300
+            )
+            results[agent_name] = r.json()
+        except Exception as e:
+            results[agent_name] = {"error": str(e)}
 
-        return results
-
-    except Exception as e:
-        log_message(task_id, f"Error in call_agent_service: {e}")
-        raise
-
+    return results
