@@ -119,7 +119,7 @@ def call_agent_service_rerun(task):
         suffix       = AGENT_PROMPTS.get(name, "")
         full_message = (
             f"Original Data was : {str(submission)}The following fields were modified:\n"
-            + "\n".join(modified_data) +
+            + "\n".join(str(modified_data)) +
             f"\n\nUse the updated values in processing.\n\n{suffix}"
         )
 
