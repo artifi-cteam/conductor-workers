@@ -129,6 +129,8 @@ def push_to_mongo(task):
         "tx_id": tx_id,
         "case_id": case_id,
         "submission_data": submission_data,
+        "history_sequence_id": 1,
+        "transaction_type": "Initial",
         "created_at": timestamp
     }
     db["BP_DATA"].update_one(
@@ -147,6 +149,8 @@ def push_to_mongo(task):
         "tx_id": tx_id,
         "case_id": case_id,
         "agent_response": agent_response,
+        "history_sequence_id": 1,
+        "transaction_type": "Initial",
         "created_at": timestamp
     }
     db["AGENT_RESPONSES"].update_one(
@@ -155,7 +159,78 @@ def push_to_mongo(task):
         upsert=True
     )
 
- 
+def push_to_mongo_updated(task):
+    input_data = task.input_data
+    task_id = task.task_id
+    log_message(task_id, "Pushing updated data to Mongo...")
+
+    try:
+        db = client["Submission_Intake"]
+        case_id = input_data.get("case_id", "")
+        submission_data = input_data.get("submission_data", {})
+        agent_response = input_data.get("agent_output", {})
+        timestamp = datetime.now()
+
+        # Fetch latest BP_DATA
+        try:
+            existing_doc = list(db["BP_DATA"].find({"case_id": case_id}).sort("created_at", -1).limit(1))
+            if not existing_doc:
+                log_message(task_id, f"No BP_DATA found for case_id: {case_id}")
+                return
+            tx_id = existing_doc[0]["tx_id"]
+            artifi_id = existing_doc[0]["artifi_id"]
+        except Exception as e:
+            log_message(task_id, f"Error fetching BP_DATA: {str(e)}")
+            return
+
+        # Get latest history_sequence_id
+        try:
+            last_response = list(db["AGENT_RESPONSES"].find({"case_id": case_id}).sort("history_sequence_id", -1).limit(1))
+            history_sequence_id = last_response[0]["history_sequence_id"] + 1 if last_response else 1
+        except Exception as e:
+            log_message(task_id, f"Error fetching AGENT_RESPONSES: {str(e)}")
+            history_sequence_id = 1
+
+        # Insert into BP_DATA
+        try:
+            bp_data_doc = {
+                "artifi_id": artifi_id,
+                "tx_id": tx_id,
+                "case_id": case_id,
+                "submission_data": submission_data,
+                "history_sequence_id": history_sequence_id,
+                "transaction_type": "Updated",
+                "created_at": timestamp
+            }
+            db["BP_DATA"].insert_one(bp_data_doc)
+        except Exception as e:
+            log_message(task_id, f"Error inserting into BP_DATA: {str(e)}")
+
+        # Save report data
+        try:
+            save_report_data(submission_data, artifi_id, tx_id)
+        except Exception as e:
+            log_message(task_id, f"Error saving report data: {str(e)}")
+
+        # Insert into AGENT_RESPONSES
+        try:
+            agent_response_doc = {
+                "artifi_id": artifi_id,
+                "tx_id": tx_id,
+                "case_id": case_id,
+                "agent_response": agent_response,
+                "history_sequence_id": history_sequence_id,
+                "transaction_type": "Updated",
+                "created_at": timestamp
+            }
+            db["AGENT_RESPONSES"].insert_one(agent_response_doc)
+        except Exception as e:
+            log_message(task_id, f"Error inserting into AGENT_RESPONSES: {str(e)}")
+
+    except Exception as e:
+        log_message(task_id, f"Unexpected error: {str(e)}")
+
+
 # Register Workers
 worker_package_to_eml = Worker(
     task_definition_name = "package_to_eml",
@@ -201,6 +276,10 @@ worker_call_agent_service_rerun = Worker(
     task_definition_name="call_agent_service_rerun",
     execute_function=call_agent_service_rerun
 )
+worker_push_to_mongo_updated = Worker(
+    task_definition_name="push_to_mongo_updated",
+    execute_function=push_to_mongo_updated
+)
 worker_send_to_service_now_rerun = Worker(
     task_definition_name="send_to_service_now_rerun",
     execute_function=send_to_service_now_rerun_worker
@@ -221,6 +300,7 @@ handler = TaskHandler(
         worker_send_to_service_now,
         worker_cleanup_eml_file_worker,
         worker_call_agent_service_rerun,
+        worker_push_to_mongo_updated,
         worker_send_to_service_now_rerun
     ],
 )
