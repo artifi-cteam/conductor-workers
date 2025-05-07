@@ -2,6 +2,7 @@ import copy
 from datetime import time
 import json
 import random
+import markdown
 import requests
 from app.utils.conductor_logger import log_message
 from app.service.mongo_service import save_report_data, client
@@ -104,37 +105,64 @@ def call_agent_service_rerun(task):
 
     # 2) merge
     merged_data = deep_update(copy.deepcopy(submission), modified_data)
-    thread_id   = input_data.get("thread_id", random.randint(1, 100000))
+    thread_id   = input_data.get("thread_id", random.randint(1,100000))
 
-    # 3) call each agent with its suffix prompt
+    # helper: safely convert markdown→HTML
+    def md2html(s: str) -> str:
+        return markdown.markdown(s)
+
+    # process each top‑level field in an agent’s response
+    def convert_section(val):
+        # if the entire section is a plain string → convert it
+        if isinstance(val, str):
+            return md2html(val)
+
+        # if it’s a dict:
+        if isinstance(val, dict):
+            
+            if isinstance(val, dict) and "result" in val:
+                # convert resp["result"]
+                val["result"] = md2html(val["result"])
+            elif isinstance(val, str):
+                # convert the whole response string
+                val["response"] = md2html(val)
+            # leave metadata or other keys untouched
+            return val
+
+        # any other type → leave
+        return val
+
+    # 3) call agents
     results = {}
-    agents = client["Agent_Database"]["AgentCatalog"].find(
-        {"AgentID": {"$in": list(TARGET_AGENT_IDS)}}
-    )
+    agents = client["Agent_Database"]["AgentCatalog"].find({
+        "AgentID": {"$in": list(TARGET_AGENT_IDS)}
+    })
+
     for agent in agents:
         name   = agent.get("AgentName", agent["AgentID"])
         config = craft_agent_config(agent)
-
-        # pick suffix and build full message
-        suffix       = AGENT_PROMPTS.get(name, "")
+        suffix = AGENT_PROMPTS.get(name, "")
         full_message = (
-            f"Original Data was : {str(submission)}The following fields were modified:\n"
-            + "\n".join(str(modified_data)) +
-            f"\n\nUse the updated values in processing.\n\n{suffix}"
+            f"Original Data was: {submission}\n"
+            f"Modified: {modified_data}\n\n"
+            "Use the updated values.\n\n"
+            f"{suffix}"
         )
 
         try:
-            log_message(task_id, f"Calling {name} with message: {full_message}")
-            resp = requests.post(
+            log_message(task_id, f"Calling {name}")
+            raw = requests.post(
                 "http://34.224.79.136:8000/query",
-                json={
-                    "agent_config": config,
-                    "message":      full_message,
-                    "thread_id":    thread_id
-                },
+                json={"agent_config": config, "message": full_message, "thread_id": thread_id},
                 timeout=300
-            )
-            results[name] = resp.json()
+            ).json()
+
+            # convert every top‑level value
+            for k, v in raw.items():
+                raw[k] = convert_section(v)
+
+            results[name] = raw
+
         except Exception as e:
             results[name] = {"error": str(e)}
 
@@ -152,22 +180,33 @@ def call_agent_service(task):
     submission = input_data.get("submission_data", {})
     thread_id  = input_data.get("thread_id", random.randint(1,100000))
 
-    db         = client["Agent_Database"]
-    collection = db["AgentCatalog"]
-    agents     = collection.find({"AgentID": {"$in": list(TARGET_AGENT_IDS)}})
+    agents = client["Agent_Database"]["AgentCatalog"].find({
+        "AgentID": {"$in": list(TARGET_AGENT_IDS)}
+    })
+
+    # helper: safely convert markdown→HTML
+    def md2html(s: str) -> str:
+        return markdown.markdown(s)
+
+    # convert top-level sections like in the rerun function
+    def convert_section(val):
+        if isinstance(val, str):
+            return md2html(val)
+        if isinstance(val, dict):
+            if "result" in val:
+                val["result"] = md2html(val["result"])
+            elif isinstance(val, str):
+                val["response"] = md2html(val)
+            return val
+        return val
 
     results = {}
     for agent in agents:
-        agent_id   = agent["AgentID"]
-        agent_name = agent.get("AgentName", agent_id)
+        agent_name = agent.get("AgentName", agent["AgentID"])
         agent_cfg  = craft_agent_config(agent)
-
-        # pick the suffix prompt for this agent (default empty)
-        suffix = AGENT_PROMPTS.get(agent_name, "")
-        # build the message
+        suffix     = AGENT_PROMPTS.get(agent_name, "")
         full_message = f"{submission} {suffix}".strip()
-
-        log_message(task_id, f"sending to {agent_name!r}: {full_message!r}")
+        log_message(task_id, f"sending to {agent_name!r}")
 
         try:
             r = requests.post(
@@ -179,7 +218,14 @@ def call_agent_service(task):
                 },
                 timeout=300
             )
-            results[agent_name] = r.json()
+            raw = r.json()
+
+            # apply markdown→HTML conversion to each top-level field
+            for k, v in raw.items():
+                raw[k] = convert_section(v)
+
+            results[agent_name] = raw
+
         except Exception as e:
             results[agent_name] = {"error": str(e)}
 
