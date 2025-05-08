@@ -5,21 +5,28 @@ def parse_us_common(json_data):
     data = json_data.get("data", [{}])[0]
     scores = data.get("scores", {})
  
-    def add_scores(section):
-        """Helper function to merge values with their respective scores if available."""
+    def add_scores(section, parent_key=None):
         updated_section = {}
         for key, value in section.items():
-            if isinstance(
-                value, dict
-            ):  # Handling nested dictionaries (like auto, 100_pct_limit)
-                updated_section[key] = add_scores(value)
-            elif isinstance(
-                value, list
-            ):  # Handling lists (like primary_sic, normalized_product)
-                updated_section[key] = value  # Lists do not have direct scores
+            if isinstance(value, dict):
+                updated_section[key] = add_scores(value, key)
+            elif isinstance(value, list):
+                if key == "primary_naics_2017":
+                    updated_section[key] = [
+                        {"naics_code": item.get("code", ""), "naics_desc": item.get("desc", "")}
+                        for item in value
+                    ]
+                elif key == "primary_sic":
+                    updated_section[key] = [
+                        {"sic_code": item.get("code", ""), "sic_desc": item.get("desc", "")}
+                        for item in value
+                    ]
+                else:
+                    updated_section[key] = value
             else:
                 updated_section[key] = {"value": value, "score": scores.get(key, "")}
         return updated_section
+
  
     # Extracting Firmographics with scores
     firmographics = add_scores(data.get("facts", {}))
