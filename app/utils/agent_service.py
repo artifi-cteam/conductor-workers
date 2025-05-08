@@ -24,12 +24,26 @@ AGENT_PROMPTS = {
     "BusineesProfileSearch": "Please search the business profile based on the JSON.",
 }
 
-def deep_update(original, updates):
-    for k, v in updates.items():
-        if isinstance(v, dict) and isinstance(original.get(k), dict):
-            deep_update(original[k], v)
-        else:
-            original[k] = v
+def deep_update(original: dict, updates: dict) -> dict:
+    """
+    Recursively walk `original`.  Whenever you encounter a key that's in `updates`:
+      - if original[k] is a dict with a 'value' key, replace original[k]['value']
+      - otherwise replace original[k] outright.
+    Returns the mutated `original`.
+    """
+    for k, v in list(original.items()):
+        # If this key needs updating, apply update logic
+        if k in updates:
+            new_val = updates[k]
+            if isinstance(original[k], dict) and 'value' in original[k]:
+                original[k]['value'] = new_val
+            else:
+                original[k] = new_val
+
+        # If the value is itself a dict, recurse into it
+        if isinstance(original[k], dict):
+            deep_update(original[k], updates)
+
     return original
 
 import json
@@ -109,7 +123,7 @@ def call_agent_service_rerun(task):
 
     # helper: safely convert markdown→HTML
     def md2html(s: str) -> str:
-        return markdown.markdown(s)
+        return markdown.markdown(s, extensions=['extra'])
 
     # process each top‑level field in an agent’s response
     def convert_section(val):
@@ -143,9 +157,7 @@ def call_agent_service_rerun(task):
         config = craft_agent_config(agent)
         suffix = AGENT_PROMPTS.get(name, "")
         full_message = (
-            f"Original Data was: {submission}\n"
-            f"Modified: {modified_data}\n\n"
-            "Use the updated values.\n\n"
+            f"{merged_data}\n"
             f"{suffix}"
         )
 
@@ -186,7 +198,7 @@ def call_agent_service(task):
 
     # helper: safely convert markdown→HTML
     def md2html(s: str) -> str:
-        return markdown.markdown(s)
+        return markdown.markdown(s, extensions=['extra'])
 
     # convert top-level sections like in the rerun function
     def convert_section(val):
