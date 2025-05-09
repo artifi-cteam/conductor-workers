@@ -16,12 +16,12 @@ TARGET_AGENT_IDS = {
     "383daaad-4b46-491b-b987-9dd17d430ca3"   # BusineesProfileSearch
 }
 AGENT_PROMPTS = {
-    "LossInsight":       "Please provide loss insights for the JSON.",
-    "ExposureInsight":   "Please provide exposure insights for the JSON.",
-    "EligibilityCheck":  "Please check eligibility based on the JSON.",
-    "InsuranceVerify":   "Please verify insurance details in the JSON.",
-    "PropEval":          "Please provide Property evaluation insights for the JSON.",
-    "BusineesProfileSearch": "Please search the business profile based on the JSON.",
+    "LossInsight":       "Please provide loss insights for the data.",
+    "ExposureInsight":   "Please provide exposure insights for the data.",
+    "EligibilityCheck":  "Please check eligibility based on the data.",
+    "InsuranceVerify":   "Please verify insurance details in the data.",
+    "PropEval":          "Please provide Property evaluation insights for the data.",
+    "BusineesProfileSearch": "Please search the business profile based on the data.",
 }
 
 def deep_update(original: dict, updates: dict) -> dict:
