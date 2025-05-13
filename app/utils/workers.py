@@ -112,7 +112,8 @@ def fetch_submission_data(task):
 def push_to_mongo(task):
     input_data = task.input_data
     task_id = task.task_id
-    log_message(task_id,"Pusing to Mongo...")
+    token = input_data.get("auth_token", "")
+    log_message(task_id, "Pushing to Mongo...")
 
     db = client["Submission_Intake"]
     tx_id = input_data.get("tx_id", "")
@@ -123,7 +124,19 @@ def push_to_mongo(task):
     artifi_id = str(uuid.uuid4())
     timestamp = datetime.now()
 
-    # BP_DATA (upsert by case_id)
+    # Get status details from external API
+    try:
+        url = f"https://api-smartdata.di-beta.boldpenguin.com/universal/v4/universal-submit/status/{tx_id}/details"
+        headers = {
+            "x-api-key": os.getenv("BP_API_KEY"),
+            "Authorization": f"Bearer {token.strip()}"
+        }
+        status_response = requests.get(url, headers=headers)
+        submit_status_details_response = status_response.json()
+    except Exception as e:
+        submit_status_details_response = {"error": str(e)}
+
+    # BP_DATA
     bp_data_doc = {
         "artifi_id": artifi_id,
         "tx_id": tx_id,
@@ -131,7 +144,8 @@ def push_to_mongo(task):
         "submission_data": submission_data,
         "history_sequence_id": 1,
         "transaction_type": "Initial",
-        "created_at": timestamp
+        "created_at": timestamp,
+        "submit_status_details": submit_status_details_response
     }
     db["BP_DATA"].update_one(
         {"case_id": case_id},
@@ -139,11 +153,10 @@ def push_to_mongo(task):
         upsert=True
     )
 
-    # BP_service (assumes idempotent save)
-    report_data = submission_data
-    save_report_data(report_data, artifi_id, tx_id)
+    # BP_service
+    save_report_data(submission_data, artifi_id, tx_id)
 
-    # AGENT_RESPONSES (upsert by case_id)
+    # AGENT_RESPONSES
     agent_response_doc = {
         "artifi_id": artifi_id,
         "tx_id": tx_id,
