@@ -158,9 +158,9 @@ def call_agent_service_rerun(task):
         config = craft_agent_config(agent)
         suffix = AGENT_PROMPTS.get(name, "")
         if agent_id == "6097c379-9637-4198-abad-a9d5416fb650":
-            sub_data = submission.get("Common", "")
+            sub_data = merged_data.get("Common", "")
         else:
-            sub_data = submission
+            sub_data = merged_data
 
         full_message = f"{sub_data} {suffix}".strip()
 
