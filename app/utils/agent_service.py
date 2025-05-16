@@ -154,12 +154,15 @@ def call_agent_service_rerun(task):
 
     for agent in agents:
         name   = agent.get("AgentName", agent["AgentID"])
+        agent_id   = agent.get("AgentID")
         config = craft_agent_config(agent)
         suffix = AGENT_PROMPTS.get(name, "")
-        full_message = (
-            f"{merged_data}\n"
-            f"{suffix}"
-        )
+        if agent_id == "6097c379-9637-4198-abad-a9d5416fb650":
+            sub_data = submission.get("Common", "")
+        else:
+            sub_data = submission
+
+        full_message = f"{sub_data} {suffix}".strip()
 
         try:
             log_message(task_id, f"Calling {name}")
@@ -214,10 +217,16 @@ def call_agent_service(task):
 
     results = {}
     for agent in agents:
+        agent_id   = agent.get("AgentID")
         agent_name = agent.get("AgentName", agent["AgentID"])
         agent_cfg  = craft_agent_config(agent)
         suffix     = AGENT_PROMPTS.get(agent_name, "")
-        full_message = f"{submission} {suffix}".strip()
+        if agent_id == "6097c379-9637-4198-abad-a9d5416fb650":
+            sub_data = submission.get("Common", "")
+        else:
+            sub_data = submission
+
+        full_message = f"{sub_data} {suffix}".strip()
         log_message(task_id, f"sending to {agent_name!r}")
 
         try:
