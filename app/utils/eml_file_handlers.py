@@ -139,6 +139,28 @@ def package_to_eml_worker(task):
 
     except Exception as e:
         logging.exception(f"Error in package_to_eml_worker for task {task_id}: {e}") # Log traceback
+        smtp_server = "smtp.gmail.com"  # Replace with your SMTP server
+        smtp_port = 587  # Common SMTP port for TLS
+        smtp_username = "meghanshdev@gmail.com"  # Replace with your email
+        smtp_password = "wppc xryq cven lzjl"  # Replace with your email password
+
+        notification_subject = f"Task {task_id} Completed"
+        notification_body = f"The EML file for Case ID {case_id} has been successfully created at {output_path}."
+
+        notification_msg = MIMEText(notification_body, 'plain')
+        notification_msg['Subject'] = notification_subject
+        notification_msg['From'] = smtp_username
+        notification_msg['To'] = "meghanshdev@gmail.com"
+
+        try:
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()  # Upgrade the connection to secure
+                server.login(smtp_username, smtp_password)
+                server.sendmail(smtp_username, recipient, notification_msg.as_string())
+                log_message(task_id, f"Notification email sent to {recipient}.")
+        except Exception as email_err:
+            logging.error(f"Failed to send notification email for task {task_id}: {email_err}")
+
         return {
             'status': 'FAILED',
             'reasonForFailure': 'EML_Packaging_Error', # Custom failure reason
