@@ -221,9 +221,48 @@ def call_agent_service(task):
         agent_name = agent.get("AgentName", agent["AgentID"])
         agent_cfg  = craft_agent_config(agent)
         suffix     = AGENT_PROMPTS.get(agent_name, "")
-        if agent_id == "6097c379-9637-4198-abad-a9d5416fb650":
-            sub_data = submission.get("Common", "")
+        # if agent_id == "6097c379-9637-4198-abad-a9d5416fb650":# InsuranceVerify
+        #     sub_data = submission.get("Common", "")
+
+        # elif agent_id == "383daaad-4b46-491b-b987-9dd17d430ca3":#LossInsight
+        #     sub_data= submission.get("Loss Runs", "")
+
+        if agent_id == "6097c379-9637-4198-abad-a9d5416fb650": # DataAnalysis (InsuranceVerify)
+            # Send common
+            sub_data = submission.get("Common", "") 
+
+        elif agent_id == "a9b0250c-0e6c-45a2-9214-0441af43b36a": # LossInsights
+            # Only send Common + Loss Run
+            sub_data = {
+                "Common": submission.get("Common",""),
+                "Loss Runs": submission.get("Loss Runs","")
+            }
+
+        elif agent_id == "8c72ba1d-9403-4782-8f8c-12564ab73f9c": # PropEval (Analytics 2)
+            # Only send Common + Property + Advanced Property
+            sub_data = {
+                "Common": submission.get("Common"),
+                "Advanced Property": submission.get("Advanced Property")
+            }
+
+        elif agent_id == "cb8d305d7cf54bbbbf0490787079dbcb": # ExposureInsights
+            # Only send submission data without LossRun
+            sub_data = submission.copy()
+            sub_data.pop("Loss Runs", None)
+
+        elif agent_id == "48e0fde3-2c69-44f0-98d6-b6a5b031c2bb": # Appetite and Eligibility
+            # Only send submission data without LossRun
+            sub_data = submission.copy()
+            sub_data.pop("Loss Runs", None)
+
+        elif agent_id == "383daaad-4b46-491b-b987-9dd17d430ca3": # Business Operations (Analytics 1)
+            # Only send Common within Submission Data
+            sub_data = {
+                "Common": submission.get("Common")
+            }
+
         else:
+            # Default case, send the entire submission
             sub_data = submission
 
         full_message = f"{sub_data} {suffix}".strip()
