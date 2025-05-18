@@ -39,7 +39,10 @@ def deep_update(original: dict, updates: dict) -> dict:
             if isinstance(original[k], dict) and 'value' in original[k]:
                 original[k]['value'] = new_val
                 # Update score if it exists, otherwise set a default score
+                log_message("deep_update", f"Updating score for key: {k}")
+                log_message(f"{original[k]}")
                 if 'score' in original[k]:
+                    log_message(f"Updating score for key: {k}")
                     original[k]['score'] = "100"  # Default score, can be customized if needed
             else:
                 original[k] = new_val
