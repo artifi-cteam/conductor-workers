@@ -24,10 +24,11 @@ AGENT_PROMPTS = {
     "BusineesProfileSearch": "Please search the business profile based on the data.",
 }
 
+#change the default score to 100
 def deep_update(original: dict, updates: dict) -> dict:
     """
-    Recursively walk `original`.  Whenever you encounter a key that's in `updates`:
-      - if original[k] is a dict with a 'value' key, replace original[k]['value']
+    Recursively walk `original`. Whenever you encounter a key that's in `updates`:
+      - if original[k] is a dict with a 'value' key, replace original[k]['value'] and update 'score' if present
       - otherwise replace original[k] outright.
     Returns the mutated `original`.
     """
@@ -37,6 +38,9 @@ def deep_update(original: dict, updates: dict) -> dict:
             new_val = updates[k]
             if isinstance(original[k], dict) and 'value' in original[k]:
                 original[k]['value'] = new_val
+                # Update score if it exists, otherwise set a default score
+                if 'score' in original[k]:
+                    original[k]['score'] = "100"  # Default score, can be customized if needed
             else:
                 original[k] = new_val
 
@@ -45,6 +49,28 @@ def deep_update(original: dict, updates: dict) -> dict:
             deep_update(original[k], updates)
 
     return original
+
+# def deep_update(original: dict, updates: dict) -> dict:
+#     """
+#     Recursively walk `original`.  Whenever you encounter a key that's in `updates`:
+#       - if original[k] is a dict with a 'value' key, replace original[k]['value']
+#       - otherwise replace original[k] outright.
+#     Returns the mutated `original`.
+#     """
+#     for k, v in list(original.items()):
+#         # If this key needs updating, apply update logic
+#         if k in updates:
+#             new_val = updates[k]
+#             if isinstance(original[k], dict) and 'value' in original[k]:
+#                 original[k]['value'] = new_val
+#             else:
+#                 original[k] = new_val
+
+#         # If the value is itself a dict, recurse into it
+#         if isinstance(original[k], dict):
+#             deep_update(original[k], updates)
+
+#     return original
 
 import json
 
@@ -157,7 +183,7 @@ def call_agent_service_rerun(task):
         agent_id   = agent.get("AgentID")
         config = craft_agent_config(agent)
         suffix = AGENT_PROMPTS.get(name, "")
-        
+
         if agent_id == "6097c379-9637-4198-abad-a9d5416fb650": # DataAnalysis (InsuranceVerify)
             # Send common
             sub_data = submission.get("Common", "") 
